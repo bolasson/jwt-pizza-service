@@ -68,3 +68,75 @@ test('add menu item as admin', async () => {
         ...newMenuItem
     });
 });
+
+test('get user orders', async () => {
+    const res = await request(app).get('/api/order').set('Authorization', `Bearer ${testUserAuthToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('dinerId');
+
+    expect(res.body).toHaveProperty('orders');
+    expect(Array.isArray(res.body.orders)).toBe(true);
+
+    if (res.body.orders.length > 0) {
+        const order = res.body.orders[0];
+        expect(order).toHaveProperty('id');
+        expect(typeof order.id).toBe('number');
+        expect(order).toHaveProperty('franchiseId');
+        expect(typeof order.franchiseId).toBe('number');
+        expect(order).toHaveProperty('storeId');
+        expect(typeof order.storeId).toBe('number');
+        expect(order).toHaveProperty('date');
+        expect(typeof order.date).toBe('string');
+        expect(order).toHaveProperty('items');
+        expect(Array.isArray(order.items)).toBe(true);
+
+        if (order.items.length > 0) {
+            const item = order.items[0];
+            expect(item).toHaveProperty('id');
+            expect(typeof item.id).toBe('number');
+            expect(item).toHaveProperty('menuId');
+            expect(typeof item.menuId).toBe('number');
+            expect(item).toHaveProperty('description');
+            expect(typeof item.description).toBe('string');
+            expect(item).toHaveProperty('price');
+            expect(typeof item.price).toBe('number');
+        }
+    }
+
+    expect(res.body).toHaveProperty('page');
+});
+
+test('create order', async () => {
+    const orderData = { franchiseId: 1, storeId: 1, items: [{ menuId: 1, description: 'Hot Honey Barbecue Chicken & Ranch', price: 0.042 }] };
+    const res = await request(app).post('/api/order').set('Authorization', `Bearer ${testUserAuthToken}`).send(orderData);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+        order: {
+            id: expect.anything(),
+            franchiseId: orderData.franchiseId,
+            storeId: orderData.storeId,
+            items: orderData.items
+        },
+        jwt: expect.anything()
+    });
+    expectValidJwt(res.body.jwt);
+});
+
+test('create order fails when factory fails', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({ reportUrl: 'http://factory.example.com/report/123' })
+    });
+
+    const orderData = { franchiseId: 1, storeId: 1, items: [{ menuId: 1, description: 'Hot Honey Barbecue Chicken & Ranch', price: 0.042 }] };
+    const res = await request(app).post('/api/order').set('Authorization', `Bearer ${testUserAuthToken}`).send(orderData);
+
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({
+        message: 'Failed to fulfill order at factory',
+        followLinkToEndChaos: 'http://factory.example.com/report/123'
+    });
+
+    global.fetch = originalFetch;
+});
