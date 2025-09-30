@@ -2,7 +2,6 @@ const express = require('express');
 const { asyncHandler } = require('../endpointHelper.js');
 const { DB, Role } = require('../database/database.js');
 const { authRouter, setAuth } = require('./authRouter.js');
-const { response } = require('../service.js');
 
 const userRouter = express.Router();
 
@@ -22,15 +21,7 @@ userRouter.docs = [
     description: 'Update user',
     example: `curl -X PUT localhost:3000/api/user/1 -d '{"name":"常用名字", "email":"a@jwt.com", "password":"admin"}' -H 'Content-Type: application/json' -H 'Authorization: Bearer tttttt'`,
     response: { user: { id: 1, name: '常用名字', email: 'a@jwt.com', roles: [{ role: 'admin' }] }, token: 'tttttt' },
-  },
-  {
-    method: 'DELETE',
-    path: '/api/user/:userId',
-    requiresAuth: true,
-    description: 'Delete user',
-    example: `curl -X DELETE  localhost:3000/api/user/1 -d '{"email":"a@jwt.com"}' -H 'Content-Type: application/json' -H 'Authorization: Bearer AUTH_TOKEN'`,
-    response: { message: 'user deleted', email: 'a@jwt.com' },
-  },
+  }
 ];
 
 // getUser
@@ -59,22 +50,5 @@ userRouter.put(
     res.json({ user: updatedUser, token: auth });
   })
 );
-
-// deleteUser
-userRouter.delete(
-  '/:userId',
-  authRouter.authenticateToken,
-  asyncHandler(async (req, res) => {
-    const { email } = req.body;
-    const userId = Number(req.params.userId);
-    const user = req.user;
-    if (user.id !== userId && !user.isRole(Role.Admin)) {
-      return res.status(403).json({ message: 'unauthorized' });
-    }
-
-    const response = await DB.deleteUser(userId, email);
-    res.json(response);
-  })
-)
 
 module.exports = userRouter;
