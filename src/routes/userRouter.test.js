@@ -37,3 +37,9 @@ test('update user', async () => {
     expect(res.body.user).toMatchObject({ name: newName, email: newEmail, roles: [{ role: 'diner' }] });
     expect(res.body.user).toHaveProperty('id');
 });
+
+test('unauthorized user update', async () => {
+    const res = await request(app).put(`/api/user/${userId * 42}`).send({ name: 'hamburger', email: randomName() + '@test.com', password: randomName() }).set('Authorization', `Bearer ${testUserAuthToken}`);
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ message: 'unauthorized' });
+});
