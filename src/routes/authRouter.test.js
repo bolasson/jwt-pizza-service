@@ -58,3 +58,9 @@ test('logout', async () => {
     expect(logoutRes.status).toBe(200);
     expect(logoutRes.body).toEqual({ message: 'logout successful' });
 });
+
+test('access endpoint with invalid token', async () => {
+    const res = await request(app).delete('/api/auth').set('Authorization', 'Bearer invalid.jwt.token');
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ message: 'unauthorized' });
+});
