@@ -75,3 +75,14 @@ test('post franchise without admin role', async () => {
     delete res.body.stack;
     expect(res.body).toEqual({ message: 'unable to create a franchise' });
 });
+
+test('delete franchise', async () => {
+    const resFranchises = await request(app).get('/api/franchise').set('Authorization', `Bearer ${testUserAuthToken}`);
+    const franchiseToDelete = resFranchises.body.franchises.find(f => f.name === testFranchise.name);
+    expect(franchiseToDelete).toBeDefined();
+    const deleteRes = await request(app).delete(`/api/franchise/${franchiseToDelete.id}`).set('Authorization', `Bearer ${testUserAuthToken}`);
+    expect(deleteRes.status).toBe(200);
+    expect(deleteRes.body).toEqual({ message: 'franchise deleted' });
+    const resFranchisesAfter = await request(app).get('/api/franchise').set('Authorization', `Bearer ${testUserAuthToken}`);
+    expect(resFranchisesAfter.body.franchises.find(f => f.name === testFranchise.name)).toBeUndefined();
+});
