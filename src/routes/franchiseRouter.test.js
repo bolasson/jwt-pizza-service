@@ -4,6 +4,7 @@ const { Role, DB } = require('../database/database.js');
 
 const testUser = { name: 'test diner', email: 'reg@test.com', password: 'a' };
 const testFranchise = { "name": "test franchise", "admins": [{ "email": "f@jwt.com" }] };
+const testFranchise2 = { "name": "test franchise 2", "admins": [{ "email": "f@jwt.com" }] };
 
 let testUserAuthToken;
 let testAdminAuthToken;
@@ -29,6 +30,7 @@ beforeAll(async () => {
     testUser.email = randomName() + '@test.com';
     const registerRes = await request(app).post('/api/auth').send(testUser);
     testUserAuthToken = registerRes.body.token;
+    testUser.id = registerRes.body.user.id;
     expectValidJwt(testUserAuthToken);
 
     const adminUser = await createAdminUser();
@@ -40,7 +42,10 @@ beforeAll(async () => {
     testAdminAuthToken = loginAdminRes.body.token;
     testFranchise.name = randomName();
     testFranchise.admins[0].email = adminUser.email;
+    testFranchise2.name = randomName();
+    testFranchise2.admins[0].email = testUser.email;
     await request(app).post('/api/franchise').set('Authorization', `Bearer ${testAdminAuthToken}`).send(testFranchise);
+    await request(app).post('/api/franchise').set('Authorization', `Bearer ${testAdminAuthToken}`).send(testFranchise2);
 });
 
 test('get all franchises', async () => {
@@ -56,4 +61,10 @@ test('get user franchises', async () => {
     expect(res.status).toBe(200);
     expect(res.body.map(f => f.name)).toContain(testFranchise.name);
     expect(res.body.map(f => f.admins).flat().map(a => a.email)).toContain(testFranchise.admins[0].email);
+});
+
+test('get user franchises as admin', async () => {
+    const res = await request(app).get(`/api/franchise/${testUser.id}`).set('Authorization', `Bearer ${testAdminAuthToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.map(f => f.name)).toContain(testFranchise2.name);
 });
