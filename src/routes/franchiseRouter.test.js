@@ -60,10 +60,14 @@ test('get user franchises', async () => {
     expect(res.body.map(f => f.admins).flat().map(a => a.email)).toContain(testFranchise2.admins[0].email);
 });
 
-test('get user franchises as admin', async () => {
-    const res = await request(app).get(`/api/franchise/${testUser.id}`).set('Authorization', `Bearer ${testAdminAuthToken}`);
+test('get user franchises as external user', async () => {
+    const otherUser = { name: 'other user', email: randomName() + '@test.com', password: 'b' };
+    const registerRes = await request(app).post('/api/auth').send(otherUser);
+    const otherUserAuthToken = registerRes.body.token;
+    expectValidJwt(otherUserAuthToken);
+    const res = await request(app).get(`/api/franchise/${testUser.id}`).set('Authorization', `Bearer ${otherUserAuthToken}`);
     expect(res.status).toBe(200);
-    expect(res.body.map(f => f.name)).toContain(testFranchise2.name);
+    expect(res.body).toEqual([]);
 });
 
 test('post franchise without admin role', async () => {
@@ -101,4 +105,23 @@ test('post store with invalid franchise id', async () => {
     expect(storeRes.status).toBe(403);
     delete storeRes.body.stack;
     expect(storeRes.body).toEqual({ message: 'unable to create a store' });
+});
+
+test('delete store', async () => {
+    const resFranchises = await request(app).get('/api/franchise').set('Authorization', `Bearer ${testUserAuthToken}`);
+    const franchise = resFranchises.body.franchises.find(f => f.name === testFranchise2.name);
+    expect(franchise).toBeDefined();
+    const storeRes = await request(app).post(`/api/franchise/${franchise.id}/store`).set('Authorization', `Bearer ${testUserAuthToken}`).send({ name: randomName(), address: 'Bag End, Bagshot Row, Hobbiton, Westfarthing, the Shire, Middle-Earth', phone: '801-867-5309' });
+    expect(storeRes.status).toBe(200);
+    const storeId = storeRes.body.id;
+    const deleteRes = await request(app).delete(`/api/franchise/${franchise.id}/store/${storeId}`).set('Authorization', `Bearer ${testUserAuthToken}`);
+    expect(deleteRes.status).toBe(200);
+    expect(deleteRes.body).toEqual({ message: 'store deleted' });
+});
+
+test('delete store with invalid franchise id', async () => {
+    const deleteRes = await request(app).delete(`/api/franchise/-1/store/1`).set('Authorization', `Bearer ${testUserAuthToken}`);
+    expect(deleteRes.status).toBe(403);
+    delete deleteRes.body.stack;
+    expect(deleteRes.body).toEqual({ message: 'unable to delete a store' });
 });
