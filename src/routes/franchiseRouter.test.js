@@ -8,7 +8,6 @@ const testFranchise2 = { "name": "test franchise 2", "admins": [{ "email": "f@jw
 
 let testUserAuthToken;
 let testAdminAuthToken;
-let testAdminUser;
 
 function randomName() {
     return Math.random().toString(36).substring(2, 12);
@@ -36,8 +35,6 @@ beforeAll(async () => {
     const adminUser = await createAdminUser();
     const loginAdminRes = await request(app).put('/api/auth').send({ email: adminUser.email, password: 'toomanysecretsformetoremember' });
     expectValidJwt(loginAdminRes.body.token);
-
-    testAdminUser = loginAdminRes.body.user;
 
     testAdminAuthToken = loginAdminRes.body.token;
     testFranchise.name = randomName();
@@ -85,4 +82,23 @@ test('delete franchise', async () => {
     expect(deleteRes.body).toEqual({ message: 'franchise deleted' });
     const resFranchisesAfter = await request(app).get('/api/franchise').set('Authorization', `Bearer ${testUserAuthToken}`);
     expect(resFranchisesAfter.body.franchises.find(f => f.name === testFranchise.name)).toBeUndefined();
+});
+
+test('post store', async () => {
+    const resFranchises = await request(app).get('/api/franchise').set('Authorization', `Bearer ${testUserAuthToken}`);
+    const franchiseToAddStore = resFranchises.body.franchises.find(f => f.name === testFranchise2.name);
+    expect(franchiseToAddStore).toBeDefined();
+    const newStore = { name: randomName(), address: 'Bag End, Bagshot Row, Hobbiton, Westfarthing, the Shire, Middle-Earth', phone: '801-867-5309' };
+    const storeRes = await request(app).post(`/api/franchise/${franchiseToAddStore.id}/store`).set('Authorization', `Bearer ${testUserAuthToken}`).send(newStore);
+    expect(storeRes.status).toBe(200);
+    expect(storeRes.body).toHaveProperty('id');
+    expect(storeRes.body).toHaveProperty('franchiseId', franchiseToAddStore.id);
+    expect(storeRes.body.name).toBe(newStore.name);
+});
+
+test('post store with invalid franchise id', async () => {
+    const storeRes = await request(app).post(`/api/franchise/-1/store`).set('Authorization', `Bearer ${testUserAuthToken}`).send({ name: 'should not work', address: 'nowhere', phone: '000-000-0000' });
+    expect(storeRes.status).toBe(403);
+    delete storeRes.body.stack;
+    expect(storeRes.body).toEqual({ message: 'unable to create a store' });
 });
