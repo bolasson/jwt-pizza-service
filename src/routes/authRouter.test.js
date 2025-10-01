@@ -1,5 +1,7 @@
 const request = require('supertest');
 const app = require('../service');
+const { DB } = require('../database/database');
+const { clearAuth } = require('./authRouter');
 
 const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
 let testUserAuthToken;
@@ -53,4 +55,22 @@ test('access endpoint with invalid token', async () => {
     const res = await request(app).delete('/api/auth').set('Authorization', 'Bearer invalid.jwt.token');
     expect(res.status).toBe(401);
     expect(res.body).toEqual({ message: 'unauthorized' });
+});
+
+test('set auth user when database is down', async () => {
+    jest.spyOn(DB, 'isLoggedIn').mockRejectedValue(new Error('db down'));
+
+    const res = await request(app).delete('/api/auth').set('Authorization', `Bearer ${testUserAuthToken}`);
+
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ message: 'unauthorized' });
+});
+
+test('logout without token', async () => {
+    const spy = jest.spyOn(DB, 'logoutUser').mockResolvedValue();
+
+    await clearAuth({ headers: {} });
+
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
 });
