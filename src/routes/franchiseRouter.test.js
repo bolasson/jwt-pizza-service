@@ -52,19 +52,26 @@ test('get all franchises', async () => {
     const res = await request(app).get('/api/franchise').set('Authorization', `Bearer ${testUserAuthToken}`);
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('franchises');
-    expect(res.body.franchises.map(f => f.name)).toContain(testFranchise.name);
+    expect(res.body.franchises.map(f => f.name)).toContain(testFranchise2.name);
     expect(Array.isArray(res.body.franchises)).toBe(true);
 });
 
 test('get user franchises', async () => {
-    const res = await request(app).get(`/api/franchise/${testAdminUser.id}`).set('Authorization', `Bearer ${testAdminAuthToken}`);
+    const res = await request(app).get(`/api/franchise/${testUser.id}`).set('Authorization', `Bearer ${testUserAuthToken}`);
     expect(res.status).toBe(200);
-    expect(res.body.map(f => f.name)).toContain(testFranchise.name);
-    expect(res.body.map(f => f.admins).flat().map(a => a.email)).toContain(testFranchise.admins[0].email);
+    expect(res.body.map(f => f.name)).toContain(testFranchise2.name);
+    expect(res.body.map(f => f.admins).flat().map(a => a.email)).toContain(testFranchise2.admins[0].email);
 });
 
 test('get user franchises as admin', async () => {
     const res = await request(app).get(`/api/franchise/${testUser.id}`).set('Authorization', `Bearer ${testAdminAuthToken}`);
     expect(res.status).toBe(200);
     expect(res.body.map(f => f.name)).toContain(testFranchise2.name);
+});
+
+test('post franchise without admin role', async () => {
+    const res = await request(app).post('/api/franchise').set('Authorization', `Bearer ${testUserAuthToken}`).send({ name: 'should not work', admins: [{ email: testUser.email }] });
+    expect(res.status).toBe(403);
+    delete res.body.stack;
+    expect(res.body).toEqual({ message: 'unable to create a franchise' });
 });
