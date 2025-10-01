@@ -1,6 +1,5 @@
 const request = require('supertest');
 const version = require('./version.json');
-const config = require('./config.js');
 const app = require('./service.js');
 
 test('get docs', async () => {
