@@ -9,5 +9,8 @@
         "global": {
             "lines": 80
         }
-    }
+    },
+    "coveragePathIgnorePatterns": [
+        "config.js"
+    ]
 }

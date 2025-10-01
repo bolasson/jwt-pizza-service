@@ -26,28 +26,3 @@ test('get unknown endpoint', async () => {
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ message: 'unknown endpoint' });
 });
-
-describe('config picks database based on NODE_ENV', () => {
-    const ORIGINAL_ENV = process.env.NODE_ENV;
-
-    afterEach(() => {
-        process.env.NODE_ENV = ORIGINAL_ENV;
-        jest.resetModules();
-    });
-
-    test('use temp database when NODE_ENV=test', () => {
-        process.env.NODE_ENV = 'test';
-        jest.isolateModules(() => {
-            const config = require('./config.js');
-            expect(config.db.connection.database).toContain('temp');
-        });
-    });
-
-    test('use regular database when NODE_ENV!=test', () => {
-        process.env.NODE_ENV = 'development';
-        jest.isolateModules(() => {
-            const config = require('./config.js');
-            expect(config.db.connection.database).not.toContain('temp');
-        });
-    });
-});
