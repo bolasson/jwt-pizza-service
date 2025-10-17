@@ -148,13 +148,14 @@ class DB {
     }
   }
 
-  async deleteUser(userId, email) {
+  async deleteUser(userId) {
     const connection = await this.getConnection();
     try {
-      await this.query(connection, `DELETE FROM user WHERE id=?`, [userId]);
-      return { message: 'user deleted', email: email };
-    }
-    finally {
+      await this.query(connection, 'DELETE FROM userRole WHERE userId = ?', [userId]);
+      const result = await this.query(connection, 'DELETE FROM user WHERE id = ?', [userId]);
+      const affected = (result && (result.affectedRows ?? result.changes)) || 0;
+      return affected > 0;
+    } finally {
       connection.end();
     }
   }

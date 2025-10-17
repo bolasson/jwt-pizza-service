@@ -81,3 +81,29 @@ test('list users', async () => {
         expect(res.body.users[0]).toHaveProperty('roles');
     }
 });
+
+test('delete user unauthorized', async () => {
+    const res = await request(app).delete('/api/user/9999');
+    expect(res.status).toBe(401);
+});
+
+test('delete user forbidden', async () => {
+    const res = await request(app).delete('/api/user/1').set('Authorization', `Bearer ${testUserAuthToken}`);
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ message: 'unauthorized' });
+});
+
+test('delete user not found', async () => {
+    const res = await request(app).delete('/api/user/999999').set('Authorization', `Bearer ${testAdminAuthToken}`);
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ message: 'not found' });
+});
+
+test('delete user', async () => {
+    const deleteableUser = { name: 'delete me', email: `${randomName()}@t.com`, password: 'x' };
+    const reg = await request(app).post('/api/auth').send(deleteableUser);
+    const deleteableUserId = reg.body.user.id;
+
+    const res = await request(app).delete(`/api/user/${deleteableUserId}`).set('Authorization', `Bearer ${testAdminAuthToken}`);
+    expect(res.status).toBe(204);
+});

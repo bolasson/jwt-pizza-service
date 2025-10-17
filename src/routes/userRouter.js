@@ -2,6 +2,7 @@ const express = require('express');
 const { asyncHandler } = require('../endpointHelper.js');
 const { DB, Role } = require('../database/database.js');
 const { authRouter, setAuth } = require('./authRouter.js');
+const { path } = require('../service.js');
 
 const userRouter = express.Router();
 
@@ -32,6 +33,14 @@ userRouter.docs = [
       users: [{ id: 1, name: 'Kai', email: 'k@jwt.com', roles: [{ role: 'diner' }] }],
       more: false
     },
+  },
+  {
+    method: 'DELETE',
+    path: '/api/user/:userId',
+    requiresAuth: true,
+    description: 'Delete user (admin only).',
+    example: `curl -X DELETE localhost:3000/api/user/1 -H 'Authorization: Bearer <token>'`,
+    response: { status: 204, message: 'Deleted user   ' },
   }
 ];
 
@@ -78,6 +87,30 @@ userRouter.get(
 
     const { users, more } = await DB.listUsers(page, limit, name);
     res.json({ users, more });
+  })
+);
+
+// deleteUser
+userRouter.delete(
+  '/:userId',
+  authRouter.authenticateToken,
+  asyncHandler(async (req, res) => {
+    const user = req.user;
+    if (!user.isRole(Role.Admin)) {
+      return res.status(403).json({ message: 'unauthorized' });
+    }
+
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId) || userId <= 0) {
+      return res.status(400).json({ message: 'invalid user id' });
+    }
+
+    const deleted = await DB.deleteUser(userId);
+    if (!deleted) {
+      return res.status(404).json({ message: 'not found' });
+    }
+
+    return res.status(204).end();
   })
 );
 
