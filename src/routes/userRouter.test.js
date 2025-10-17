@@ -1,8 +1,10 @@
 const request = require('supertest');
 const app = require('../service');
+const { Role, DB } = require('../database/database.js');
 
 const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
 let testUserAuthToken;
+let testAdminAuthToken;
 let userId;
 
 function randomName() {
@@ -13,12 +15,25 @@ function expectValidJwt(potentialJwt) {
     expect(potentialJwt).toMatch(/^[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*$/);
 }
 
+async function createAdminUser() {
+    let user = { password: 'toomanysecretsformetoremember', roles: [{ role: Role.Admin }] };
+    user.name = randomName();
+    user.email = `${user.name}@admin.com`;
+    user = await DB.addUser(user);
+    return { ...user, password: 'toomanysecretsformetoremember' };
+}
+
 beforeAll(async () => {
     testUser.email = randomName() + '@test.com';
     const registerRes = await request(app).post('/api/auth').send(testUser);
     testUserAuthToken = registerRes.body.token;
     userId = registerRes.body.user.id;
     expectValidJwt(testUserAuthToken);
+
+    const adminUser = await createAdminUser();
+    const loginAdminRes = await request(app).put('/api/auth').send({ email: adminUser.email, password: 'toomanysecretsformetoremember' });
+    testAdminAuthToken = loginAdminRes.body.token;
+    expectValidJwt(testAdminAuthToken);
 });
 
 test('get authenticated user', async () => {
@@ -42,4 +57,27 @@ test('unauthorized user update', async () => {
     const res = await request(app).put(`/api/user/${userId * 42}`).send({ name: 'hamburger', email: randomName() + '@test.com', password: randomName() }).set('Authorization', `Bearer ${testUserAuthToken}`);
     expect(res.status).toBe(403);
     expect(res.body).toEqual({ message: 'unauthorized' });
+});
+
+test('list users unauthorized', async () => {
+    const res = await request(app).get('/api/user');
+    expect(res.status).toBe(401);
+});
+
+test('list users forbidden', async () => {
+    const res = await request(app).get('/api/user').set('Authorization', `Bearer ${testUserAuthToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ message: 'unauthorized' });
+});
+
+test('list users', async () => {
+    const res = await request(app).get('/api/user?page=1&limit=10&name=*').set('Authorization', `Bearer ${testAdminAuthToken}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.users)).toBe(true);
+    expect(res.body).toHaveProperty('more');
+    if (res.body.users.length) {
+        expect(res.body.users[0]).toHaveProperty('roles');
+    }
 });

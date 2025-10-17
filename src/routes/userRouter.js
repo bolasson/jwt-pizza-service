@@ -21,6 +21,17 @@ userRouter.docs = [
     description: 'Update user',
     example: `curl -X PUT localhost:3000/api/user/1 -d '{"name":"常用名字", "email":"a@jwt.com", "password":"admin"}' -H 'Content-Type: application/json' -H 'Authorization: Bearer tttttt'`,
     response: { user: { id: 1, name: '常用名字', email: 'a@jwt.com', roles: [{ role: 'admin' }] }, token: 'tttttt' },
+  },
+  {
+    method: 'GET',
+    path: '/api/user?page=1&limit=10&name=*',
+    requiresAuth: true,
+    description: 'Gets a paginated list of users (admin only).',
+    example: `curl -X GET localhost:3000/api/user -H 'Authorization: Bearer <token>'`,
+    response: {
+      users: [{ id: 1, name: 'Kai', email: 'k@jwt.com', roles: [{ role: 'diner' }] }],
+      more: false
+    },
   }
 ];
 
@@ -48,6 +59,25 @@ userRouter.put(
     const updatedUser = await DB.updateUser(userId, name, email, password);
     const auth = await setAuth(updatedUser);
     res.json({ user: updatedUser, token: auth });
+  })
+);
+
+// listUsers
+userRouter.get(
+  '/',
+  authRouter.authenticateToken,
+  asyncHandler(async (req, res) => {
+    const user = req.user;
+    if (!user.isRole(Role.Admin)) {
+      return res.status(403).json({ message: 'unauthorized' });
+    }
+
+    const page = Math.max(parseInt(req.query.page ?? '1', 10), 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit ?? '10', 10), 1), 100);
+    const name = (req.query.name ?? '').toString();
+
+    const { users, more } = await DB.listUsers(page, limit, name);
+    res.json({ users, more });
   })
 );
 

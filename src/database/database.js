@@ -99,6 +99,55 @@ class DB {
     }
   }
 
+  async listUsers(page = 1, limit = 10, name = '*') {
+    const connection = await this.getConnection();
+    try {
+      const offset = (page - 1) * limit;
+
+      let nameFilter = (name ?? '*').toString().replace(/\*/g, '%').trim();
+      if (!nameFilter || nameFilter === '') nameFilter = '%';
+      if (!name.includes('*') && nameFilter !== '%') nameFilter = `%${name}%`;
+
+      let users = await this.query(
+        connection,
+        `SELECT id, name, email
+         FROM user
+        WHERE name LIKE ?
+        ORDER BY id ASC
+        LIMIT ${limit + 1} OFFSET ${offset}`,
+        [nameFilter]
+      );
+
+      const more = users.length > limit;
+      if (more) users = users.slice(0, limit);
+
+      const ids = users.map(u => u.id);
+      let rolesByUser = {};
+      if (ids.length) {
+        const placeholders = ids.map(() => '?').join(',');
+        const roleRows = await this.query(
+          connection,
+          `SELECT userId, role, objectId FROM userRole WHERE userId IN (${placeholders})`,
+          ids
+        );
+        for (const r of roleRows) {
+          (rolesByUser[r.userId] ||= []).push({ role: r.role, objectId: r.objectId || undefined });
+        }
+      }
+
+      const resultUsers = users.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        roles: rolesByUser[u.id] || []
+      }));
+
+      return { users: resultUsers, more };
+    } finally {
+      connection.end();
+    }
+  }
+
   async deleteUser(userId, email) {
     const connection = await this.getConnection();
     try {
