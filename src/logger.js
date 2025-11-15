@@ -12,7 +12,7 @@ class Logger {
                     method: req.method,
                     statusCode: res.statusCode,
                     reqBody: JSON.stringify(req.body),
-                    resBody: JSON.stringify(resBody)
+                    resBody: JSON.stringify(this.sanitize(resBody))
                 };
                 const level = this.statusToLogLevel(res.statusCode);
                 this.log(level, 'http', logData);
@@ -45,13 +45,10 @@ class Logger {
 
     sanitize(logData) {
         let data = JSON.stringify(logData);
-        data = data.replace(/"password":\s*"[^"]*"/gi, '"password": "*****"');
-        data = data.replace(/"(token|apiKey|authorization)":\s*"[^"]*"/gi, '"$1": "*****"');
-        data = data.replace(/("(?:body|response)":\s*")(.*?)(")/gi, (match, p1, p2, p3) => {
-            const truncated = p2.length > 200 ? p2.substring(0, 200) + '... [truncated]' : p2;
-            return p1 + truncated + p3;
-        });
-
+        data = data.replace(/\\"password\\":\s*\\"[^"]*\\"/g, '\\"password\\": \\"*****\\"');
+        data = data.replace(/\\"token\\":\s*\\"[^"]*\\"/g, '\\"token\\": \\"*****\\"');
+        data = data.replace(/\\"apiKey\\":\s*\\"[^"]*\\"/g, '\\"apiKey\\": \\"*****\\"');
+        data = data.replace(/\\"authorization\\":\s*\\"[^"]*\\"/g, '\\"authorization\\": \\"*****\\"');
         return data;
     }
 
