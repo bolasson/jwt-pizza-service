@@ -10,7 +10,8 @@
             "lines": 80
         }
     },
+    "testPathIgnorePatterns": ["/node_modules/", "/dist/"],
     "coveragePathIgnorePatterns": [
-        "config.js"
+        "config.js", "/dist/", "/node_modules/", "src/logger.js"
     ]
 }

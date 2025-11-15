@@ -16,7 +16,7 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   next();
 });
-app.use(metrics.requestTracker);
+app.use(require('./logger').httpLogger);
 
 const apiRouter = express.Router();
 app.use('/api', apiRouter);
@@ -48,8 +48,14 @@ app.use('*', (req, res) => {
 
 // Default error handler for all exceptions and errors.
 app.use((err, req, res, next) => {
+  require('./logger').log('error', 'unhandled', {
+    path: req.originalUrl,
+    method: req.method,
+    statusCode: err.statusCode ?? 500,
+    message: err.message,
+    stack: err.stack,
+  });
   res.status(err.statusCode ?? 500).json({ message: err.message, stack: err.stack });
   next();
 });
-
 module.exports = app;

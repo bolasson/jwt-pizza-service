@@ -1,5 +1,5 @@
-const config = require('./config.json');
-import fetch from 'node-fetch';
+const config = require('./config.js');
+const fetch = require('node-fetch');
 
 class Logger {
     httpLogger = (req, res, next) => {
@@ -26,7 +26,7 @@ class Logger {
     };
 
     log(level, type, logData) {
-        const labels = { component: config.source, level: level, type: type };
+        const labels = { component: config.logging.source, level: level, type: type };
         const values = [this.nowString(), this.sanitize(logData)];
         const logEvent = { streams: [{ stream: labels, values: [values] }] };
 
@@ -45,24 +45,25 @@ class Logger {
 
     sanitize(logData) {
         let data = JSON.stringify(logData);
-        data = data.replace(/\\"password\\":\s*\\"[^"]*\\"/gi, '\\"password\\": \\"*****\\"');
-        data = data.replace(/\\"(token|apiKey|authorization)\\":\s*\\"[^"]*\\"/gi, '\\"$1\\": \\"*****\\"');
-        data = data.replace(/(\\"(body|response)\\":\s*\")(.*?)(\\")/gi, (match, p1, p2, p3, p4) => {
-            const truncated = p3.length > 200 ? p3.substring(0, 200) + '... [truncated]' : p3;
-            return p1 + truncated + p4;
+        data = data.replace(/"password":\s*"[^"]*"/gi, '"password": "*****"');
+        data = data.replace(/"(token|apiKey|authorization)":\s*"[^"]*"/gi, '"$1": "*****"');
+        data = data.replace(/("(?:body|response)":\s*")(.*?)(")/gi, (match, p1, p2, p3) => {
+            const truncated = p2.length > 200 ? p2.substring(0, 200) + '... [truncated]' : p2;
+            return p1 + truncated + p3;
         });
 
         return data;
     }
 
     sendLogToGrafana(event) {
+        if (!config.logging.enabled) return;
         const body = JSON.stringify(event);
-        fetch(`${config.url}`, {
+        fetch(`${config.logging.url}`, {
             method: 'post',
             body: body,
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${config.userId}:${config.apiKey}`,
+                Authorization: `Bearer ${config.logging.userId}:${config.logging.apiKey}`,
             },
         }).then((res) => {
             if (!res.ok) console.log('Failed to send log to Grafana');

@@ -4,6 +4,7 @@ const config = require('../config.js');
 const { StatusCodeError } = require('../endpointHelper.js');
 const { Role } = require('../model/model.js');
 const dbModel = require('./dbModel.js');
+const logger = require('../logger.js');
 class DB {
   constructor() {
     this.initialized = this.initializeDatabase();
@@ -250,12 +251,15 @@ class DB {
     const connection = await this.getConnection();
     try {
       await connection.beginTransaction();
+      logger.log('info', 'db_tx', { action: 'begin', franchiseId });
       try {
         await this.query(connection, `DELETE FROM store WHERE franchiseId=?`, [franchiseId]);
         await this.query(connection, `DELETE FROM userRole WHERE objectId=?`, [franchiseId]);
         await this.query(connection, `DELETE FROM franchise WHERE id=?`, [franchiseId]);
         await connection.commit();
-      } catch {
+        logger.log('info', 'db_tx', { action: 'commit', franchiseId });
+      } catch (e) {
+        logger.log('error', 'db_tx', { action: 'rollback', franchiseId, error: e.message });
         await connection.rollback();
         throw new StatusCodeError('unable to delete franchise', 500);
       }
@@ -355,12 +359,21 @@ class DB {
   }
 
   async query(connection, sql, params) {
-    const [results] = await connection.execute(sql, params);
-    return results;
+    const start = Date.now();
+    try {
+      const [results] = await connection.execute(sql, params);
+      const durationMs = Date.now() - start;
+      const rowCount = (Array.isArray(results) ? results.length : (results?.affectedRows ?? 0)) || 0;
+      logger.log('info', 'db', { sql, params, durationMs, rowCount });
+      return results;
+    } catch (error) {
+      logger.log('error', 'db', { sql, params, error: error.message });
+      throw error;
+    }
   }
 
   async getID(connection, key, value, table) {
-    const [rows] = await connection.execute(`SELECT id FROM ${table} WHERE ${key}=?`, [value]);
+    const rows = await this.query(connection, `SELECT id FROM ${table} WHERE ${key}=?`, [value]);
     if (rows.length > 0) {
       return rows[0].id;
     }
@@ -418,7 +431,7 @@ class DB {
   }
 
   async checkDatabaseExists(connection) {
-    const [rows] = await connection.execute(`SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?`, [config.db.connection.database]);
+    const rows = await this.query(connection, `SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?`, [config.db.connection.database]);
     return rows.length > 0;
   }
 }
